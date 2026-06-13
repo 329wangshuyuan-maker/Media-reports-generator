@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>滤材测试报告生成器</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f5f5f0;color:#1a1a1a;min-height:100vh;padding:1.25rem 1rem}
+.wrap{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:.9rem}
+.hdr{background:#17375E;color:#fff;border-radius:12px;padding:1.1rem 1.6rem;display:flex;align-items:center;gap:12px}
+.hdr h1{font-size:18px;font-weight:600;margin-bottom:2px}
+.hdr p{font-size:11px;opacity:.72}
+.card{background:#fff;border-radius:10px;border:1px solid #e2e0d8;padding:1.1rem 1.3rem}
+.card-title{font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.07em;margin-bottom:.8rem}
+#boot-bar{display:flex;align-items:center;gap:10px;font-size:13px;color:#185fa5}
+#boot-progress{flex:1;height:5px;background:#c8dcf0;border-radius:3px;overflow:hidden}
+#boot-fill{height:100%;width:0;background:#1F497D;border-radius:3px;transition:width .35s}
+.drop{border:2px dashed #4472C4;border-radius:9px;padding:1.6rem;text-align:center;cursor:pointer;transition:.15s;background:#eef4fb;user-select:none}
+.drop:hover,.drop.over{background:#d6e8f7;border-color:#17375E}
+.drop.off{opacity:.4;pointer-events:none}
+.drop h3{font-size:13px;font-weight:600;color:#1F497D;margin:.4rem 0 .2rem}
+.drop p{font-size:11px;color:#999}
+.info-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:.75rem}
+.info-row label{font-size:11px;font-weight:600;color:#555;white-space:nowrap}
+.info-row input{border:1px solid #ccc;border-radius:6px;padding:5px 8px;font-size:12px;min-width:140px;flex:1}
+.info-row input:focus{outline:none;border-color:#4472C4;box-shadow:0 0 0 2px #d0e4f8}
+.chips{display:flex;flex-direction:column;gap:4px;margin-top:.6rem}
+.chip{display:flex;align-items:center;gap:7px;padding:5px 9px;background:#f5f5f0;border:1px solid #ddd;border-radius:7px;font-size:11px}
+.chip .badge{font-size:10px;padding:1px 6px;border-radius:20px;background:#dce6f1;color:#1F497D;font-weight:600;margin-left:auto;white-space:nowrap}
+.chip .rm{cursor:pointer;color:#bbb;margin-left:4px;font-size:14px;line-height:1}
+.chip .rm:hover{color:#c0504d}
+.st{padding:8px 12px;border-radius:7px;font-size:12px;display:none;align-items:center;gap:6px;margin-top:.6rem}
+.st.show{display:flex}.st.info{background:#e6f1fb;color:#185fa5}.st.ok{background:#eaf3de;color:#3b6d11}
+.st.warn{background:#faeeda;color:#854f0b}.st.err{background:#fcebeb;color:#a32d2d}
+.btn-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:.85rem}
+button{display:inline-flex;align-items:center;gap:5px;padding:7px 15px;font-size:12px;font-weight:600;border-radius:7px;border:none;cursor:pointer;transition:opacity .15s}
+button:disabled{opacity:.4;cursor:not-allowed}
+.btn-p{background:#17375E;color:#fff}.btn-p:not(:disabled):hover{background:#1d4575}
+.btn-s{background:#e2e0d8;color:#333}.btn-s:not(:disabled):hover{background:#c8c6be}
+.tabs{display:flex;gap:0;border-bottom:2px solid #e0ddd5;margin-bottom:0}
+.tab{padding:7px 16px;font-size:12px;font-weight:600;cursor:pointer;color:#888;border-bottom:2px solid transparent;margin-bottom:-2px;transition:.15s;white-space:nowrap}
+.tab.active{color:#1F497D;border-bottom-color:#1F497D;background:#fff}
+.tab:hover:not(.active){color:#555;background:#f5f5f0}
+.tab-content{display:none;padding-top:8px}.tab-content.active{display:block}
+table{width:100%;border-collapse:collapse;font-size:11.5px}
+thead tr{background:#1F497D}
+th{padding:7px 8px;text-align:center;font-weight:600;color:#fff;border:1px solid #4472C4;white-space:pre-line;line-height:1.3;font-size:10.5px}
+th.L{text-align:left}
+td{padding:5px 8px;border:1px solid #e0ddd5;vertical-align:middle}
+td.R{text-align:right;font-variant-numeric:tabular-nums}
+td.C{text-align:center;font-variant-numeric:tabular-nums}
+td.L{text-align:left}
+tr.alt td{background:#dce6f1}tr.norm td{background:#fff}
+.cov-ok{background:#eaf3de;color:#3b6d11;padding:1px 6px;border-radius:20px;font-size:10px;font-weight:700;display:inline-block}
+.cov-w{background:#faeeda;color:#854f0b;padding:1px 6px;border-radius:20px;font-size:10px;font-weight:700;display:inline-block}
+.cov-b{background:#fcebeb;color:#a32d2d;padding:1px 6px;border-radius:20px;font-size:10px;font-weight:700;display:inline-block}
+.chart-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(440px,1fr));gap:12px;padding:4px 0}
+.chart-card{background:#fff;border:1px solid #e0ddd5;border-radius:8px;overflow:hidden}
+.ch-title{background:#1F497D;color:#fff;font-size:11px;font-weight:600;padding:6px 10px}
+.ch-body{position:relative;height:240px;padding:4px}
+.ch-stats{display:grid;grid-template-columns:1fr 1fr;gap:2px;padding:6px 10px;border-top:1px solid #eee;font-size:10px;color:#555}
+.ch-stats span{font-weight:600}
+footer{text-align:center;font-size:10px;color:#bbb;margin-top:.5rem;padding-bottom:.5rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="hdr">
+  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+    <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+  </svg>
+  <div>
+    <h1>滤材测试报告生成器 / Filter Media Report Generator</h1>
+    <p>无需安装任何软件，浏览器直接运行 · 首次需联网加载 Python 环境（约 10~30 秒）</p>
+  </div>
+</div>
+
+<div class="card" id="boot-card">
+  <div id="boot-bar">
+    <span id="boot-msg">⏳ 正在加载 Python 运行环境…</span>
+    <div id="boot-progress"><div id="boot-fill"></div></div>
+  </div>
+</div>
+
+<div id="ui" style="display:none">
+  <div class="card">
+    <div class="card-title">上传文件 / Upload TDMS Files</div>
+    <div class="drop off" id="dz" onclick="openPicker()">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4472C4" stroke-width="1.5" style="display:block;margin:0 auto 7px">
+        <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
+        <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+      </svg>
+      <h3>拖拽 .tdms 文件到此处，或点击选择</h3>
+      <p>支持：thickness · air permeability · bursting strength · corrugation · grammage · pore size · bending stiffness</p>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="st" id="st"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">报告信息（自动从文件提取，可修改）</div>
+    <div class="info-row">
+      <label>样品编号 Sample No.:</label>
+      <input id="inp-sno" placeholder="从 TDMS 自动读取">
+      <label>操作员 Operator:</label>
+      <input id="inp-opr" placeholder="从 TDMS 自动读取">
+    </div>
+    <div class="btn-row">
+      <button class="btn-s" onclick="clearAll()">🗑 清空</button>
+      <button class="btn-p" id="btn-exp" disabled onclick="doExport()">📥 导出带样式 Excel（含曲线图）</button>
+    </div>
+  </div>
+
+  <div class="card" id="preview-card" style="display:none">
+    <div class="card-title">数据预览 / Preview</div>
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab(0)">📊 汇总报告</div>
+      <div class="tab"        onclick="switchTab(1)">📋 单值明细</div>
+      <div class="tab"        onclick="switchTab(2)">📈 曲线图表</div>
+    </div>
+
+    <div class="tab-content active" id="tab0">
+      <div style="overflow-x:auto">
+      <table><thead><tr>
+        <th class="L" style="min-width:180px">测试项目\nTest Item</th>
+        <th>单位\nUnit</th><th>标准\nStd</th>
+        <th>平均值\nMean</th><th>最小值\nMin</th><th>最大值\nMax</th>
+        <th>标准差\nStd Dev</th><th>变异系数\nCoV%</th><th>N</th>
+      </tr></thead>
+      <tbody id="tb-summary"></tbody></table></div>
+    </div>
+
+    <div class="tab-content" id="tab1">
+      <div style="overflow-x:auto">
+      <table><thead><tr id="th-vals"></tr></thead>
+      <tbody id="tb-vals"></tbody></table></div>
+    </div>
+
+    <div class="tab-content" id="tab2">
+      <div class="chart-grid" id="chart-grid"></div>
+    </div>
+  </div>
+</div>
+
+<footer>双击 HTML 文件即可运行 · 全部数据在本地浏览器处理，不上传任何服务器</footer>
+</div>
+
+<input type="file" id="fi" multiple accept=".tdms" style="display:none" onchange="handleFiles(this.files)">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script>
+
+let pyodide = null;
+let ALL = [];
+let loaded = new Map();
+let chartObjs = [];
+let processing = false;  // 防止并发
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+async function boot() {
+  const fill = document.getElementById('boot-fill');
+  const msg  = document.getElementById('boot-msg');
+  try {
+    msg.textContent = '⏳ 加载 Pyodide 核心（约 10~20 秒）…';
+    fill.style.width = '15%';
+    pyodide = await loadPyodide();
+
+    fill.style.width = '50%';
+    msg.textContent = '📦 安装 openpyxl（约 5~10 秒）…';
+    await pyodide.loadPackage('micropip');
+    const micropip = pyodide.pyimport('micropip');
+    await micropip.install('openpyxl');
+
+    fill.style.width = '85%';
+    msg.textContent = '🔧 初始化 Python 模块…';
+    await pyodide.runPythonAsync(PYTHON_CODE);
+
+    fill.style.width = '100%';
+    msg.textContent = '✅ 就绪！可以上传文件了';
+    setTimeout(() => {
+      document.getElementById('boot-card').style.display = 'none';
+      document.getElementById('ui').style.display = '';
+      document.getElementById('dz').classList.remove('off');
+    }, 400);
+  } catch(e) {
+    msg.textContent = '❌ 加载失败: ' + e;
+    console.error(e);
+  }
+}
+
+// ── File handling — 关键：串行处理，避免 pyodide 全局变量竞争 ─────────────
+const dz = document.getElementById('dz');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); handleFiles(e.dataTransfer.files); });
+function openPicker() { document.getElementById('fi').click(); }
+
+async function handleFiles(files) {
+  if (processing) { setSt('⏳ 正在处理中，请稍候…', 'warn'); return; }
+  const list = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.tdms'));
+  if (!list.length) { setSt('⚠ 未找到 .tdms 文件', 'warn'); return; }
+
+  const newFiles = list.filter(f => !loaded.has(f.name));
+  if (!newFiles.length) { setSt(`⚠ 所选文件已全部加载过（共 ${ALL.length} 个测试项）`, 'warn'); return; }
+
+  processing = true;
+  setSt(`⏳ 正在串行解析 ${newFiles.length} 个文件…`, 'info');
+
+  let parsed = 0;
+  for (const f of newFiles) {  // ← 关键：for...of 串行，而非并发 forEach
+    try {
+      setSt(`⏳ 解析中 (${parsed + 1}/${newFiles.length}): ${f.name}`, 'info');
+
+      // 读取文件为 Uint8Array
+      const bytes = await readFileAsync(f);
+
+      // ── 关键修复：用 base64 传递，彻底避免共享全局变量 ──
+      const b64 = btoa(String.fromCharCode(...bytes));
+
+      // Python 端从 base64 解码，完全独立，无竞争
+      const jsonStr = await pyodide.runPythonAsync(`
+import base64, json as _json
+_raw = base64.b64decode(${JSON.stringify(b64)})
+_fn  = ${JSON.stringify(f.name)}
+_json.dumps(parse_tdms_js(bytes(_raw), _fn))
+`);
+
+      const res = JSON.parse(jsonStr);
+      const items = res.items || [];
+
+      if (items.length === 0) {
+        setSt(`⚠ ${f.name} 未解析到数据，跳过`, 'warn');
+        parsed++;
+        continue;
+      }
+
+      items.forEach(item => {
+        const idx = ALL.findIndex(x => x.name === item.name);
+        if (idx === -1) ALL.push(item);
+        else ALL[idx] = item;
+      });
+
+      if (res.sample_no && !document.getElementById('inp-sno').value)
+        document.getElementById('inp-sno').value = res.sample_no;
+      if (res.operator && !document.getElementById('inp-opr').value)
+        document.getElementById('inp-opr').value = res.operator;
+
+      loaded.set(f.name, items.length);
+      addChip(f.name, items.length);
+      parsed++;
+
+    } catch(err) {
+      setSt(`❌ 解析失败: ${f.name} — ${err}`, 'err');
+      console.error(err);
+      parsed++;
+    }
+  }
+
+  processing = false;
+  setSt(`✅ 已加载 ${parsed} 个文件，共 ${ALL.length} 个测试项`, 'ok');
+  renderAll();
+  document.getElementById('btn-exp').disabled = ALL.length === 0;
+  document.getElementById('fi').value = '';  // 允许重新选同名文件
+}
+
+// 把 FileReader 回调包装为 Promise
+function readFileAsync(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload  = e => resolve(new Uint8Array(e.target.result));
+    r.onerror = e => reject(e);
+    r.readAsArrayBuffer(file);
+  });
+}
+
+function addChip(name, n) {
+  if (document.querySelector(`[data-fn="${CSS.escape(name)}"]`)) return;
+  const d = document.createElement('div');
+  d.className = 'chip'; d.dataset.fn = name;
+  d.innerHTML = `
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4472C4" stroke-width="2">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+    </svg>
+    <span>${name}</span>
+    <span class="badge">${n} 测试项</span>
+    <span class="rm" title="移除" onclick="rmChip(this,'${name.replace(/'/g,"\\'").replace(/"/g,'&quot;')}')">×</span>`;
+  document.getElementById('chips').appendChild(d);
+}
+
+function rmChip(el, name) {
+  loaded.delete(name);
+  el.closest('.chip').remove();
+  setSt('已移除文件标记。如需更新数据，请清空后重新选择文件', 'warn');
+}
+
+function clearAll() {
+  ALL = []; loaded.clear();
+  document.getElementById('chips').innerHTML = '';
+  document.getElementById('inp-sno').value = '';
+  document.getElementById('inp-opr').value = '';
+  document.getElementById('preview-card').style.display = 'none';
+  document.getElementById('btn-exp').disabled = true;
+  document.getElementById('st').className = 'st';
+  chartObjs.forEach(c => c.destroy()); chartObjs = [];
+  document.getElementById('chart-grid').innerHTML = '';
+}
+
+// ── Tab ────────────────────────────────────────────────────────────────────
+function switchTab(i) {
+  document.querySelectorAll('.tab').forEach((t, j) => t.classList.toggle('active', j === i));
+  document.querySelectorAll('.tab-content').forEach((t, j) => t.classList.toggle('active', j === i));
+  if (i === 2) chartObjs.forEach(c => c.resize());
+}
+
+// ── Stats ──────────────────────────────────────────────────────────────────
+function calcStats(vals) {
+  const n = vals.length;
+  const mean = vals.reduce((a, b) => a + b, 0) / n;
+  const std  = Math.sqrt(vals.reduce((s, v) => s + (v - mean) ** 2, 0) / (n - 1));
+  const cov  = mean !== 0 ? std / mean * 100 : NaN;
+  return { n, mean, std, min: Math.min(...vals), max: Math.max(...vals), cov };
+}
+const f = (v, d = 3) => isFinite(v) ? v.toFixed(d) : 'N/A';
+function covBadge(cov) {
+  const cls = cov > 15 ? 'cov-b' : cov > 5 ? 'cov-w' : 'cov-ok';
+  return `<span class="${cls}">${f(cov, 2)}%</span>`;
+}
+
+// ── Render all ─────────────────────────────────────────────────────────────
+function renderAll() {
+  document.getElementById('preview-card').style.display = '';
+  renderSummary();
+  renderValues();
+  renderCharts();
+}
+
+function renderSummary() {
+  const tb = document.getElementById('tb-summary');
+  tb.innerHTML = '';
+  ALL.forEach((t, i) => {
+    const s = calcStats(t.values);
+    const tr = document.createElement('tr');
+    tr.className = i % 2 === 1 ? 'alt' : 'norm';
+    tr.innerHTML = `
+      <td class="L">${t.name}</td>
+      <td class="C">${t.unit}</td>
+      <td class="C">${t.std}</td>
+      <td class="C"><b>${f(s.mean)}</b></td>
+      <td class="C">${f(s.min)}</td>
+      <td class="C">${f(s.max)}</td>
+      <td class="C">${f(s.std)}</td>
+      <td class="C">${covBadge(s.cov)}</td>
+      <td class="C">${s.n}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function renderValues() {
+  const maxN = Math.max(...ALL.map(t => t.values.length));
+  const thr = document.getElementById('th-vals');
+  let h = `<th class="L" style="min-width:160px">测试项目 / Test Item</th><th>单位\nUnit</th>`;
+  for (let i = 1; i <= maxN; i++) h += `<th>测量值${i}\nVal ${i}</th>`;
+  h += `<th>均值\nMean</th><th>标准差\nStd</th><th>最小值\nMin</th><th>最大值\nMax</th><th>CoV%</th>`;
+  thr.innerHTML = h;
+
+  const tb = document.getElementById('tb-vals');
+  tb.innerHTML = '';
+  ALL.forEach((t, i) => {
+    const s = calcStats(t.values);
+    const tr = document.createElement('tr');
+    tr.className = i % 2 === 1 ? 'alt' : 'norm';
+    let cells = `<td class="L">${t.name}</td><td class="C">${t.unit}</td>`;
+    for (let vi = 0; vi < maxN; vi++) {
+      cells += `<td class="R">${t.values[vi] !== undefined ? f(t.values[vi]) : ''}</td>`;
+    }
+    cells += `<td class="R"><b>${f(s.mean)}</b></td>`;
+    cells += `<td class="R">${f(s.std)}</td>`;
+    cells += `<td class="R">${f(s.min)}</td>`;
+    cells += `<td class="R">${f(s.max)}</td>`;
+    cells += `<td class="C">${covBadge(s.cov)}</td>`;
+    tr.innerHTML = cells;
+    tb.appendChild(tr);
+  });
+}
+
+function renderCharts() {
+  chartObjs.forEach(c => c.destroy()); chartObjs = [];
+  const grid = document.getElementById('chart-grid');
+  grid.innerHTML = '';
+
+  ALL.forEach(t => {
+    const s = calcStats(t.values);
+    const mean = s.mean, s3 = 3 * s.std;
+    const labels = t.values.map((_, i) => i + 1);
+
+    const card = document.createElement('div'); card.className = 'chart-card';
+    const cid = 'ch_' + Math.random().toString(36).slice(2);
+    card.innerHTML = `
+      <div class="ch-title">▶ ${t.name} [${t.unit}] — ${t.std}</div>
+      <div class="ch-body"><canvas id="${cid}"></canvas></div>
+      <div class="ch-stats">
+        <div>均值 Mean: <span>${f(s.mean)}</span></div>
+        <div>标准差 Std: <span>${f(s.std)}</span></div>
+        <div>最小值 Min: <span>${f(s.min)}</span></div>
+        <div>最大值 Max: <span>${f(s.max)}</span></div>
+        <div>变异系数 CoV: <span>${f(s.cov, 2)}%</span></div>
+        <div>Mean±3σ: <span>${f(mean - s3)} ~ ${f(mean + s3)}</span></div>
+      </div>`;
+    grid.appendChild(card);
+
+    const ctx = document.getElementById(cid).getContext('2d');
+    const ch = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: '测量值', data: t.values,
+            borderColor: '#1F497D', backgroundColor: '#1F497D',
+            borderWidth: 2, pointRadius: 5, pointBackgroundColor: '#1F497D', tension: 0,
+            datalabels: {
+              display: true,
+              align: 'top',
+              anchor: 'end',
+              formatter: v => f(v, 3),
+              font: { size: 9.5, weight: '600', family: 'Arial' },
+              color: '#17375E',
+              padding: { bottom: 2 },
+              clip: false,
+            }},
+          { label: 'Mean', data: t.values.map(() => mean),
+            borderColor: '#C0504D', borderWidth: 1.8, borderDash: [6, 3],
+            pointRadius: 0, fill: false, datalabels: { display: false } },
+          { label: 'Mean+3σ', data: t.values.map(() => mean + s3),
+            borderColor: '#70AD47', borderWidth: 1.2, borderDash: [4, 4],
+            pointRadius: 0, fill: false, datalabels: { display: false } },
+          { label: 'Mean-3σ', data: t.values.map(() => mean - s3),
+            borderColor: '#70AD47', borderWidth: 1.2, borderDash: [4, 4],
+            pointRadius: 0, fill: false, datalabels: { display: false } },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } },
+          tooltip: { callbacks: { label: c => `${c.dataset.label}: ${f(c.raw)}` } },
+          datalabels: { display: false }   // 全局默认关闭，由 dataset 级别覆盖
+        },
+        scales: {
+          x: { title: { display: true, text: 'Measurement No.', font: { size: 10 } },
+               grid: { color: '#e8e8e8', borderDash: [3, 3] }, ticks: { font: { size: 10 } } },
+          y: { title: { display: true, text: t.unit, font: { size: 10 } },
+               grid: { color: '#e8e8e8', borderDash: [3, 3] },
+               ticks: { font: { size: 10 }, callback: v => f(v) } }
+        }
+      }
+    });
+    chartObjs.push(ch);
+  });
+}
+
+// ── Export ─────────────────────────────────────────────────────────────────
+async function doExport() {
+  const btn = document.getElementById('btn-exp');
+  btn.disabled = true; btn.textContent = '⏳ 生成 Excel 中…';
+  setSt('⏳ 正在生成带样式 Excel（含曲线图），请稍候…', 'info');
+  try {
+    const sno = document.getElementById('inp-sno').value.trim();
+    const opr = document.getElementById('inp-opr').value.trim();
+    // JSON 传递，完全可靠
+    const payload = JSON.stringify({ all_data: ALL, sample_no: sno, operator: opr });
+    pyodide.globals.set('_export_json', payload);
+    const xlBytes = await pyodide.runPythonAsync(`
+import json as _j
+_d = _j.loads(_export_json)
+build_excel_bytes(_d['all_data'], _d['sample_no'], _d['operator'])
+`);
+    const bytes = new Uint8Array(xlBytes.toJs());
+    const blob  = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `filter_media_report_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    setSt(`✅ Excel 已下载（${ALL.length} 个测试项，3 个 Sheet：汇总报告 · 单值明细 · 曲线图表）`, 'ok');
+  } catch(e) {
+    setSt('❌ 导出失败: ' + e, 'err');
+    console.error(e);
+  }
+  btn.disabled = false; btn.textContent = '📥 导出带样式 Excel（含曲线图）';
+}
+
+// ── Status ─────────────────────────────────────────────────────────────────
+function setSt(msg, lv) {
+  const el = document.getElementById('st');
+  el.className = 'st show ' + lv;
+  el.textContent = msg;
+}
+
+// ── Python Code ────────────────────────────────────────────────────────────
+const PYTHON_CODE = `
+import struct, math, io, json, base64
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+from openpyxl.chart import LineChart, Reference
+from openpyxl.chart.axis import ChartLines
+from openpyxl.chart.shapes import GraphicalProperties
+from openpyxl.chart.layout import Layout, ManualLayout
+from openpyxl.drawing.line import LineProperties
+
+_TS = {1:1,2:2,3:4,4:8,5:1,6:2,7:4,8:8,9:4,10:8,0x21:1,0x44:16}
+_TF = {1:'<b',2:'<h',3:'<i',4:'<q',5:'<B',6:'<H',7:'<I',8:'<Q',9:'<f',10:'<d',0x21:'<B'}
+
+def _meta(data):
+    def rs(p):
+        if p+4>len(data): return None,p
+        l=struct.unpack('<I',data[p:p+4])[0]; e=p+4+l
+        return (None,p) if e>len(data) else (data[p+4:e].decode('utf-8',errors='replace'),e)
+    def rv(p,pt):
+        if pt==0x20: return rs(p)
+        if pt==0x44: return 'ts',p+16
+        sz=_TS.get(pt); fmt=_TF.get(pt)
+        if not sz or not fmt: return None,None
+        if p+sz>len(data): return None,p+sz
+        return struct.unpack(fmt,data[p:p+sz])[0],p+sz
+    if len(data)<32: return {}
+    n=struct.unpack('<I',data[28:32])[0]; op=32; P={}
+    for _ in range(min(n,100)):
+        if op+4>len(data): break
+        pl=struct.unpack('<I',data[op:op+4])[0]
+        path=data[op+4:op+4+pl].decode('utf-8',errors='replace'); op+=4+pl
+        if op+4>len(data): break
+        rdi=struct.unpack('<I',data[op:op+4])[0]; op+=4
+        if rdi==0:
+            if op+16>len(data): break
+            op+=16
+        if op+4>len(data): break
+        np_=struct.unpack('<I',data[op:op+4])[0]; op+=4
+        kv={}
+        for _ in range(min(np_,100)):
+            if op+4>len(data): break
+            kl=struct.unpack('<I',data[op:op+4])[0]
+            key=data[op+4:op+4+kl].decode('utf-8',errors='replace'); op+=4+kl
+            if op+4>len(data): break
+            pt=struct.unpack('<I',data[op:op+4])[0]; op+=4
+            v,nop=rv(op,pt)
+            if nop is None: break
+            op=nop; kv[key]=v
+        P[path]=kv
+    return P
+
+def parse_tdms_js(data, fname):
+    if data[:4]!=b'TDSm': return {'items':[],'sample_no':'','operator':''}
+    raw_off=struct.unpack('<q',data[20:28])[0]; rs_=28+raw_off
+    tm=data[:rs_].decode('utf-8',errors='replace').lower()
+    meta=_meta(data[:rs_])
+    md=meta.get("/'metadata'",{}); root=meta.get('/',{})
+    sno=str(md.get('dut_number','') or '').strip()
+    opr=str(md.get('MR_operator','') or root.get('author','') or '').strip()
+    floats=[]
+    for i in range(rs_,len(data)-7,8):
+        v=struct.unpack('<d',data[i:i+8])[0]
+        if math.isfinite(v): floats.append(v)
+    if not floats: return {'items':[],'sample_no':sno,'operator':opr}
+    fn=fname.lower(); R=[]
+    if 'bending' in fn:
+        h=len(floats)//2
+        R.append({'name':'Bending Stiffness Md','unit':'Nmm','std':'DIN 53 121','values':floats[:h]})
+        R.append({'name':'Bending Stiffness Cd','unit':'Nmm','std':'DIN 53 121','values':floats[h:]})
+    elif 'thickness' in fn and 'corrugation' not in fn:
+        R.append({'name':'Thickness of Filter Media','unit':'mm','std':'MHN 610 110','values':floats[:10]})
+    elif 'air' in fn:
+        n=len(floats)//3
+        R.append({'name':'Air Permeability (Not Corrected)','unit':'l/m\u00b2/s','std':'ISO 9237','values':floats[:n]})
+        R.append({'name':'Air Permeability Side Air','unit':'l/m\u00b2/s','std':'ISO 9237','values':floats[n:2*n]})
+        R.append({'name':'Air Permeability (Corrected)','unit':'l/m\u00b2/s','std':'ISO 9237','values':floats[2*n:3*n]})
+    elif 'bursting' in fn and ('_2_' in fn or 'aged' in tm):
+        R.append({'name':'Bursting Strength (Aged, 160\u00b0C/24h)','unit':'bar','std':'ISO 2758','values':floats[:10]})
+    elif 'bursting' in fn:
+        R.append({'name':'Bursting Strength','unit':'bar','std':'ISO 2758','values':floats[:10]})
+    elif 'corrugation' in fn:
+        n=len(floats)//3
+        R.append({'name':'Height of Corrugation (CD)','unit':'mm','std':'MHN 610 110','values':floats[:n]})
+        R.append({'name':'Thickness (Corrugation)','unit':'mm','std':'MHN 610 110','values':floats[n:2*n]})
+        R.append({'name':'Height of Corrugation','unit':'mm','std':'MHN 610 110','values':floats[2*n:3*n]})
+    elif 'grammage' in fn:
+        h=len(floats)//2
+        R.append({'name':'Grammage','unit':'g/m\u00b2','std':'MHN 610 110','values':floats[h:]})
+    elif 'pore' in fn:
+        h=len(floats)//2
+        R.append({'name':'Largest Pore in Area','unit':'\u00b5m','std':'MHN 610 110','values':floats[:h]})
+        R.append({'name':'Mean Pore Size (Many Pores)','unit':'\u00b5m','std':'MHN 610 110','values':floats[h:]})
+    else:
+        import os; R.append({'name':os.path.splitext(fname)[0],'unit':'-','std':'-','values':floats})
+    return {'items':[r for r in R if r['values']],'sample_no':sno,'operator':opr}
+
+CT='0F243E'; CH_='1F497D'; CA_='DCE6F1'; CB_='8EA9C1'
+CBL='1F497D'; CR='C0504D'; CG='70AD47'; CAX='404040'
+CHART_W=22; CHART_H=12; CHART_ROWS=25
+
+def _bd():
+    s=Side(style='thin',color=CB_)
+    return Border(left=s,right=s,top=s,bottom=s)
+
+def _gl(c='DDDDDD',w=7000,d='sysDash'):
+    cl=ChartLines(); gp=GraphicalProperties(); gp.ln=LineProperties()
+    gp.ln.solidFill=c; gp.ln.w=w; gp.ln.prstDash=d
+    cl.graphicalProperties=gp; return cl
+
+def sc(cell, v, bg, fg='FF000000', bold=False, sz=10, ha='center', wrap=False, nf=None):
+    cell.value=v
+    cell.font=Font(name='Arial',bold=bold,size=sz,color=fg)
+    cell.fill=PatternFill('solid',fgColor=bg)
+    cell.alignment=Alignment(horizontal=ha,vertical='center',wrap_text=wrap)
+    cell.border=_bd()
+    if nf: cell.number_format=nf
+
+def cs(vals):
+    n=len(vals); mean=sum(vals)/n
+    std=math.sqrt(sum((v-mean)**2 for v in vals)/(n-1))
+    return {'n':n,'mean':mean,'std':std,'min':min(vals),'max':max(vals),
+            'cov':std/mean*100 if mean else float('nan')}
+
+def _add_chart(ws, t, hr):
+    vals=t['values']; s=cs(vals); n=len(vals); unit=t['unit']; name=t['name']
+    for col,val,clr in [(1,'No.','555555'),(2,name,'1F497D'),(3,'Mean','C0504D'),
+                         (4,'Mean+3\u03c3','70AD47'),(5,'Mean-3\u03c3','70AD47')]:
+        ws.cell(hr,col).value=val
+        ws.cell(hr,col).font=Font(name='Arial',size=9,bold=True,color=clr)
+    for i,v in enumerate(vals):
+        r=hr+1+i
+        ws.cell(r,1).value=i+1; ws.cell(r,2).value=round(v,4)
+        ws.cell(r,3).value=round(s['mean'],4)
+        ws.cell(r,4).value=round(s['mean']+3*s['std'],4)
+        ws.cell(r,5).value=round(s['mean']-3*s['std'],4)
+    de=hr+n
+    lbs=[(f'n  =  {s["n"]}','333333'),
+         (f'Mean     =  {s["mean"]:.4f} {unit}','C0504D'),
+         (f'Std       =  {s["std"]:.4f} {unit}','555555'),
+         (f'Mean+3\u03c3 = {s["mean"]+3*s["std"]:.4f} {unit}','70AD47'),
+         (f'Mean-3\u03c3 = {s["mean"]-3*s["std"]:.4f} {unit}','70AD47'),
+         (f'Min      =  {s["min"]:.4f} {unit}','555555'),
+         (f'Max      =  {s["max"]:.4f} {unit}','555555'),
+         (f'CoV      =  {s["cov"]:.2f} %','555555')]
+    for di,(lb,clr) in enumerate(lbs):
+        c=ws.cell(hr+di,7); c.value=lb
+        c.font=Font(name='Arial Narrow',size=9,color=clr)
+        c.alignment=Alignment(horizontal='left',vertical='center')
+    chart=LineChart(); chart.title=None; chart.style=2
+    chart.width=CHART_W; chart.height=CHART_H
+    chart.y_axis.title=unit; chart.y_axis.numFmt='0.000'
+    chart.y_axis.tickLblPos='low'; chart.y_axis.delete=False
+    gy=GraphicalProperties(); gy.ln=LineProperties(); gy.ln.solidFill=CAX; gy.ln.w=14000; chart.y_axis.spPr=gy
+    chart.y_axis.majorGridlines=_gl('DDDDDD',7000,'sysDash')
+    chart.y_axis.minorGridlines=_gl('F0F0F0',4000,'sysDot')
+    chart.x_axis.title='Measurement No.'; chart.x_axis.tickLblPos='low'; chart.x_axis.delete=False
+    gx=GraphicalProperties(); gx.ln=LineProperties(); gx.ln.solidFill=CAX; gx.ln.w=14000; chart.x_axis.spPr=gx
+    chart.x_axis.majorGridlines=_gl('DDDDDD',7000,'sysDash')
+    chart.legend.position='r'; chart.legend.overlay=False
+    lay=Layout(); ml=ManualLayout()
+    ml.xMode='edge'; ml.x=0.02; ml.yMode='edge'; ml.y=0.05
+    ml.wMode='edge'; ml.w=0.68; ml.hMode='edge'; ml.h=0.88
+    lay.manualLayout=ml; chart.plot_area.layout=lay
+    rv=Reference(ws,min_col=2,min_row=hr,max_row=de)
+    chart.add_data(rv,titles_from_data=True)
+    s0=chart.series[0]; s0.graphicalProperties.line.solidFill=CBL; s0.graphicalProperties.line.width=22000
+    s0.marker.symbol='circle'; s0.marker.size=7
+    s0.marker.graphicalProperties.solidFill=CBL; s0.marker.graphicalProperties.line.solidFill=CBL
+    from openpyxl.chart.label import DataLabelList
+    dLbls=DataLabelList()
+    dLbls.showVal=True; dLbls.showLegendKey=False; dLbls.showCatName=False
+    dLbls.showSerName=False; dLbls.showPercent=False; dLbls.showBubbleSize=False
+    dLbls.position='t'; dLbls.numFmt='0.000'
+    s0.dLbls=dLbls
+    rm=Reference(ws,min_col=3,min_row=hr,max_row=de); chart.add_data(rm,titles_from_data=True)
+    s1=chart.series[1]; s1.graphicalProperties.line.solidFill=CR
+    s1.graphicalProperties.line.width=18000; s1.graphicalProperties.line.prstDash='dash'; s1.marker.symbol='none'
+    ru=Reference(ws,min_col=4,min_row=hr,max_row=de); chart.add_data(ru,titles_from_data=True)
+    s2=chart.series[2]; s2.graphicalProperties.line.solidFill=CG
+    s2.graphicalProperties.line.width=13000; s2.graphicalProperties.line.prstDash='dash'; s2.marker.symbol='none'
+    rl=Reference(ws,min_col=5,min_row=hr,max_row=de); chart.add_data(rl,titles_from_data=True)
+    s3=chart.series[3]; s3.graphicalProperties.line.solidFill=CG
+    s3.graphicalProperties.line.width=13000; s3.graphicalProperties.line.prstDash='dash'; s3.marker.symbol='none'
+    cats=Reference(ws,min_col=1,min_row=hr+1,max_row=de); chart.set_categories(cats)
+    ws.add_chart(chart,f'H{hr}')
+
+def build_excel_bytes(all_data, sample_no='', operator=''):
+    wb=openpyxl.Workbook()
+    # Sheet 1
+    ws1=wb.active; ws1.title='\u6c47\u603b\u62a5\u544a Summary'
+    ws1.merge_cells('A1:I1')
+    sc(ws1['A1'],'\u6ee4\u6750\u6d4b\u8bd5\u62a5\u544a / Filter Media Test Report',
+       CT,fg='FFFFFFFF',bold=True,sz=13,ha='center',wrap=True)
+    ws1.row_dimensions[1].height=30
+    ws1.merge_cells('A2:D2')
+    sc(ws1['A2'],f'\u6837\u54c1\u7f16\u53f7 / Sample No.: {sample_no}','FFFFFFFF',bold=True,sz=10,ha='left')
+    ws1.merge_cells('E2:I2')
+    sc(ws1['E2'],f'\u64cd\u4f5c\u5458 / Operator: {operator}','FFFFFFFF',bold=True,sz=10,ha='left')
+    ws1.row_dimensions[2].height=18
+    hdrs=['\u6d4b\u8bd5\u9879\u76ee\\nTest Item','\u5355\u4f4d\\nUnit','\u6807\u51c6\\nStandard',
+          '\u5e73\u5747\u503c\\nMean','\u6700\u5c0f\u503c\\nMin','\u6700\u5927\u503c\\nMax',
+          '\u6807\u51c6\u5dee\\nStd Dev','\u53d8\u5f02\u7cfb\u6570\\nCoV (%)','\u6d4b\u91cf\u6b21\u6570\\nN']
+    for ci,h in enumerate(hdrs,1):
+        sc(ws1.cell(3,ci),h,CH_,fg='FFFFFFFF',bold=True,ha='left' if ci==1 else 'center',wrap=True)
+    ws1.row_dimensions[3].height=34.5
+    for ri,t in enumerate(all_data):
+        s=cs(t['values']); row=ri+4; bg=CA_ if ri%2==1 else 'FFFFFFFF'
+        ws1.row_dimensions[row].height=15.75
+        sc(ws1.cell(row,1),t['name'],bg,ha='left'); sc(ws1.cell(row,2),t['unit'],bg)
+        sc(ws1.cell(row,3),t['std'],bg)
+        sc(ws1.cell(row,4),round(s['mean'],4),bg,nf='0.000')
+        sc(ws1.cell(row,5),round(s['min'],4),bg,nf='0.000')
+        sc(ws1.cell(row,6),round(s['max'],4),bg,nf='0.000')
+        sc(ws1.cell(row,7),round(s['std'],4),bg,nf='0.000')
+        sc(ws1.cell(row,8),round(s['cov'],2),bg,nf='0.00')
+        sc(ws1.cell(row,9),s['n'],bg)
+    for col,w in zip('ABCDEFGHI',[35,10,14,12,12,12,12,12,8]):
+        ws1.column_dimensions[col].width=w
+    ws1.freeze_panes='A4'
+    # Sheet 2
+    ws2=wb.create_sheet('\u5355\u503c\u660e\u7ec6 Individual Values')
+    maxN=max(len(t['values']) for t in all_data); total_c=2+maxN+5; lc=get_column_letter(total_c)
+    ws2.merge_cells(f'A1:{lc}1')
+    sc(ws2['A1'],'\u5355\u503c\u660e\u7ec6 / Individual Measurement Values',
+       CT,fg='FFFFFFFF',bold=True,sz=13,ha='center',wrap=True)
+    ws2.row_dimensions[1].height=27.75
+    hdrs2=['\u6d4b\u8bd5\u9879\u76ee / Test Item','\u5355\u4f4d\\nUnit']
+    hdrs2+=[f'\u6d4b\u91cf\u503c{i}\\nValue {i}' for i in range(1,maxN+1)]
+    hdrs2+=['\u5e73\u5747\u503c\\nMean','\u6807\u51c6\u5dee\\nStd','\u6700\u5c0f\u503c\\nMin',
+            '\u6700\u5927\u503c\\nMax','\u53d8\u5f02\u7cfb\u6570\\nCoV (%)']
+    for ci,h in enumerate(hdrs2,1):
+        sc(ws2.cell(2,ci),h,CH_,fg='FFFFFFFF',bold=True,ha='left' if ci==1 else 'center',wrap=True)
+    ws2.row_dimensions[2].height=34.5
+    for ri,t in enumerate(all_data):
+        s=cs(t['values']); row=ri+3; bg=CA_ if ri%2==1 else 'FFFFFFFF'
+        ws2.row_dimensions[row].height=15.75
+        sc(ws2.cell(row,1),t['name'],bg,ha='left'); sc(ws2.cell(row,2),t['unit'],bg)
+        for vi in range(maxN):
+            v=round(t['values'][vi],4) if vi<len(t['values']) else ''
+            sc(ws2.cell(row,3+vi),v,bg,nf='0.000' if v!='' else None)
+        for si,(val,bld,fmt) in enumerate([
+            (round(s['mean'],4),True,'0.000'),(round(s['std'],4),False,'0.000'),
+            (round(s['min'],4),False,'0.000'),(round(s['max'],4),False,'0.000'),
+            (round(s['cov'],2),False,'0.00')]):
+            sc(ws2.cell(row,3+maxN+si),val,bg,bold=bld,nf=fmt)
+    ws2.column_dimensions['A'].width=35; ws2.column_dimensions['B'].width=10
+    for ci in range(3,total_c+1): ws2.column_dimensions[get_column_letter(ci)].width=9
+    for ci in range(3+maxN,total_c+1): ws2.column_dimensions[get_column_letter(ci)].width=11
+    ws2.freeze_panes='A3'
+    # Sheet 3
+    ws3=wb.create_sheet('\u66f2\u7ebf\u56fe\u8868 Charts')
+    for col,w in {'A':6,'B':14,'C':12,'D':13,'E':13,'F':2,'G':28,'H':1}.items():
+        ws3.column_dimensions[col].width=w
+    ws3.sheet_format.defaultRowHeight=15; ws3.sheet_format.customHeight=True
+    ws3.merge_cells('A1:G1')
+    sc(ws3['A1'],'\u6d4b\u91cf\u503c\u66f2\u7ebf\u56fe / Measurement Value Charts',
+       CT,fg='FFFFFFFF',bold=True,sz=13,ha='center')
+    ws3.row_dimensions[1].height=26
+    ws3.merge_cells('A2:G2')
+    sc(ws3['A2'],'\u56fe\u4f8b\uff1a\u25cf\u84dd\u8272\u5b9e\u7ebf=\u6d4b\u91cf\u503c  --\u7ea2\u8272\u865a\u7ebf=\u5747\u503c  --\u7eff\u8272\u865a\u7ebf=Mean\u00b13\u03c3',
+       'EEF4FB',fg='1F497D',sz=9,ha='left')
+    ws3.row_dimensions[2].height=15; ws3.row_dimensions[3].height=6
+    cur=4
+    for t in all_data:
+        ws3.merge_cells(f'A{cur}:G{cur}')
+        sc(ws3[f'A{cur}'],f'\u25b6  {t["name"]}  [{t["unit"]}]  \u2014  {t["std"]}',
+           CH_,fg='FFFFFFFF',bold=True,sz=10,ha='left')
+        ws3.row_dimensions[cur].height=18
+        da=cur+1; _add_chart(ws3,t,da)
+        for r in range(da,da+len(t['values'])+2): ws3.row_dimensions[r].height=15
+        cur+=CHART_ROWS
+    buf=io.BytesIO(); wb.save(buf); buf.seek(0); return buf.read()
+
+print("Python modules ready — serial processing enabled")
+`;
+
+// 注册 datalabels 插件（仅对需要的图表局部启用）
+Chart.register(ChartDataLabels);
+boot();
+</script>
+</body>
+</html>
