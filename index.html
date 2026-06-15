@@ -13,9 +13,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
 .hdr p{font-size:11px;opacity:.72}
 .card{background:#fff;border-radius:10px;border:1px solid #e2e0d8;padding:1.1rem 1.3rem}
 .card-title{font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.07em;margin-bottom:.8rem}
-#boot-bar{display:flex;align-items:center;gap:10px;font-size:13px;color:#185fa5}
-#boot-progress{flex:1;height:5px;background:#c8dcf0;border-radius:3px;overflow:hidden}
-#boot-fill{height:100%;width:0;background:#1F497D;border-radius:3px;transition:width .35s}
 .drop{border:2px dashed #4472C4;border-radius:9px;padding:1.6rem;text-align:center;cursor:pointer;transition:.15s;background:#eef4fb;user-select:none}
 .drop:hover,.drop.over{background:#d6e8f7;border-color:#17375E}
 .drop.off{opacity:.4;pointer-events:none}
@@ -86,6 +83,7 @@ footer{text-align:center;font-size:10px;color:#bbb;margin-top:.5rem;padding-bott
 </style>
 </head>
 <body>
+
 <!-- Login Overlay -->
 <div id="login-overlay">
   <div class="login-box">
@@ -96,15 +94,11 @@ footer{text-align:center;font-size:10px;color:#bbb;margin-top:.5rem;padding-bott
       </svg>
     </div>
     <h2>滤材测试报告生成器<br>Filter Media Report Generator</h2>
-
-    <!-- 加载进度区域 -->
     <div class="login-boot">
-      <div class="login-boot-msg" id="lboot-msg">⏳ 正在加载 Python 运行环境，请稍候…</div>
+      <div class="login-boot-msg" id="lboot-msg">⏳ 正在检测网络并加载环境，请稍候…</div>
       <div class="login-boot-track"><div class="login-boot-fill" id="lboot-fill"></div></div>
     </div>
-    <div class="login-boot-ready" id="lboot-ready">✅ 环境加载完成，请输入密码继续 / Ready — enter password below</div>
-
-    <!-- 密码输入（加载期间禁用） -->
+    <div class="login-boot-ready" id="lboot-ready">✅ 环境加载完成，请输入密码继续 / Ready — enter password</div>
     <div class="login-field">
       <label>密码 Password</label>
       <input type="password" id="login-pwd" placeholder="加载完成后可输入 / Loading…" maxlength="20" disabled
@@ -116,7 +110,6 @@ footer{text-align:center;font-size:10px;color:#bbb;margin-top:.5rem;padding-bott
 </div>
 
 <div class="wrap">
-
 <div class="hdr">
   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -130,9 +123,11 @@ footer{text-align:center;font-size:10px;color:#bbb;margin-top:.5rem;padding-bott
 </div>
 
 <div class="card" id="boot-card">
-  <div id="boot-bar">
+  <div id="boot-bar" style="display:flex;align-items:center;gap:10px;font-size:13px;color:#185fa5">
     <span id="boot-msg">⏳ 正在加载 Python 运行环境…</span>
-    <div id="boot-progress"><div id="boot-fill"></div></div>
+    <div id="boot-progress" style="flex:1;height:5px;background:#c8dcf0;border-radius:3px;overflow:hidden">
+      <div id="boot-fill" style="height:100%;width:0;background:#1F497D;border-radius:3px;transition:width .35s"></div>
+    </div>
   </div>
 </div>
 
@@ -172,7 +167,6 @@ footer{text-align:center;font-size:10px;color:#bbb;margin-top:.5rem;padding-bott
       <div class="tab"        onclick="switchTab(1)">📋 单值明细</div>
       <div class="tab"        onclick="switchTab(2)">📈 曲线图表</div>
     </div>
-
     <div class="tab-content active" id="tab0">
       <div style="overflow-x:auto">
       <table><thead><tr>
@@ -183,34 +177,52 @@ footer{text-align:center;font-size:10px;color:#bbb;margin-top:.5rem;padding-bott
       </tr></thead>
       <tbody id="tb-summary"></tbody></table></div>
     </div>
-
     <div class="tab-content" id="tab1">
       <div style="overflow-x:auto">
       <table><thead><tr id="th-vals"></tr></thead>
       <tbody id="tb-vals"></tbody></table></div>
     </div>
-
     <div class="tab-content" id="tab2">
       <div class="chart-grid" id="chart-grid"></div>
     </div>
   </div>
 </div>
+</div>
 
 <footer>双击 HTML 文件即可运行 · 全部数据在本地浏览器处理，不上传任何服务器</footer>
-</div>
 
 <input type="file" id="fi" multiple accept=".tdms" style="display:none" onchange="handleFiles(this.files)">
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
 <script>
+'use strict';
 
 let pyodide = null;
-let ALL = [];
-let loaded = new Map();
-let chartObjs = [];
-let processing = false;  // 防止并发
+let ALL = [], loaded = new Map(), chartObjs = [], processing = false;
+
+// ── CDN 自动选择（竞速检测）────────────────────────────────────────────────
+// 用一个极小的探针文件竞速，哪个先到就用哪套 CDN
+async function detectCDN() {
+  const PROBE = 'pyodide.asm.data'; // 两端都有此文件
+  const CN_BASE  = 'https://cdn.jsdelivr.net/npm/pyodide@0.26.4/full/';
+  const INT_BASE = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/';
+
+  // 只取响应头，不下载 body，极快
+  const race = (url) => fetch(url, { method: 'HEAD', cache: 'no-store' })
+    .then(r => r.ok ? url : Promise.reject())
+    .catch(() => new Promise(() => {})); // 失败则永远 pending，让另一个赢
+
+  try {
+    const winner = await Promise.race([
+      race(CN_BASE  + 'pyodide.js').then(() => CN_BASE),
+      race(INT_BASE + 'pyodide.js').then(() => INT_BASE),
+    ]);
+    return winner;
+  } catch(e) {
+    return CN_BASE; // 探测失败默认用 npm 路径
+  }
+}
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 async function boot() {
@@ -227,21 +239,44 @@ async function boot() {
   }
 
   try {
-    setProgress(15, '⏳ 加载 Pyodide 核心（约 10~20 秒）…');
-    pyodide = await loadPyodide();
+    // Step 1: 竞速选 CDN
+    setProgress(5, '🌐 检测最优线路…');
+    const baseURL = await detectCDN();
+    const isCN = baseURL.includes('/npm/');
+    const region = isCN ? '国内加速线路' : '国际线路';
+    console.log('[CDN]', region, baseURL);
 
-    setProgress(50, '📦 安装 openpyxl（约 5~10 秒）…');
+    // Step 2: 动态加载 pyodide.js
+    setProgress(10, `⏳ 加载 Pyodide 核心（${region}，约 10~20 秒）…`);
+    await loadScript(baseURL + 'pyodide.js');
+
+    // Step 3: 初始化 Pyodide，指定 indexURL
+    setProgress(20, `⏳ 初始化 Python 环境（${region}）…`);
+    pyodide = await loadPyodide({ indexURL: baseURL });
+
+    // Step 4: 安装 micropip + openpyxl
+    setProgress(55, '📦 安装 openpyxl…');
     await pyodide.loadPackage('micropip');
     const micropip = pyodide.pyimport('micropip');
-    await micropip.install('openpyxl');
 
+    // openpyxl 镜像：国内用 npmmirror whl 镜像，海外用 PyPI
+    if (isCN) {
+      // npmmirror 提供 PyPI 包镜像
+      await micropip.install(
+        'https://cdn.npmmirror.com/binaries/pyodide/v0.26.4/openpyxl-3.1.5-py2.py3-none-any.whl'
+      );
+    } else {
+      await micropip.install('openpyxl');
+    }
+
+    // Step 5: 初始化 Python 模块
     setProgress(85, '🔧 初始化 Python 模块…');
     await pyodide.runPythonAsync(PYTHON_CODE);
 
     setProgress(100, '✅ 就绪！可以上传文件了');
 
     // 解锁登录框
-    document.getElementById('lboot-msg').textContent = '✅ 加载完成 / Environment ready';
+    document.getElementById('lboot-msg').textContent = `✅ 加载完成（${region}）`;
     document.getElementById('lboot-ready').classList.add('show');
     const pwd = document.getElementById('login-pwd');
     const btn = document.getElementById('btn-login');
@@ -256,6 +291,7 @@ async function boot() {
       document.getElementById('ui').style.display = '';
       document.getElementById('dz').classList.remove('off');
     }, 400);
+
   } catch(e) {
     const errText = '❌ 加载失败: ' + e;
     msg.textContent  = errText;
@@ -264,7 +300,30 @@ async function boot() {
   }
 }
 
-// ── File handling — 关键：串行处理，避免 pyodide 全局变量竞争 ─────────────
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+// ── Login ──────────────────────────────────────────────────────────────────
+function doLogin() {
+  if (!pyodide) return;
+  const pwd = document.getElementById('login-pwd').value;
+  const err = document.getElementById('login-err');
+  if (pwd === 'FM') {
+    document.getElementById('login-overlay').style.display = 'none';
+    err.classList.remove('show');
+  } else {
+    err.classList.add('show');
+    document.getElementById('login-pwd').value = '';
+    document.getElementById('login-pwd').focus();
+  }
+}
+
+// ── File handling ──────────────────────────────────────────────────────────
 const dz = document.getElementById('dz');
 dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
 dz.addEventListener('dragleave', () => dz.classList.remove('over'));
@@ -275,47 +334,32 @@ async function handleFiles(files) {
   if (processing) { setSt('⏳ 正在处理中，请稍候…', 'warn'); return; }
   const list = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.tdms'));
   if (!list.length) { setSt('⚠ 未找到 .tdms 文件', 'warn'); return; }
-
   const newFiles = list.filter(f => !loaded.has(f.name));
   if (!newFiles.length) { setSt(`⚠ 所选文件已全部加载过（共 ${ALL.length} 个测试项）`, 'warn'); return; }
 
   processing = true;
   setSt(`⏳ 正在串行解析 ${newFiles.length} 个文件…`, 'info');
-
   let parsed = 0;
-  for (const f of newFiles) {  // ← 关键：for...of 串行，而非并发 forEach
+
+  for (const f of newFiles) {
     try {
-      setSt(`⏳ 解析中 (${parsed + 1}/${newFiles.length}): ${f.name}`, 'info');
-
-      // 读取文件为 Uint8Array
+      setSt(`⏳ 解析中 (${parsed+1}/${newFiles.length}): ${f.name}`, 'info');
       const bytes = await readFileAsync(f);
-
-      // ── 关键修复：用 base64 传递，彻底避免共享全局变量 ──
       const b64 = btoa(String.fromCharCode(...bytes));
-
-      // Python 端从 base64 解码，完全独立，无竞争
       const jsonStr = await pyodide.runPythonAsync(`
 import base64, json as _json
 _raw = base64.b64decode(${JSON.stringify(b64)})
 _fn  = ${JSON.stringify(f.name)}
 _json.dumps(parse_tdms_js(bytes(_raw), _fn))
 `);
-
       const res = JSON.parse(jsonStr);
       const items = res.items || [];
-
-      if (items.length === 0) {
-        setSt(`⚠ ${f.name} 未解析到数据，跳过`, 'warn');
-        parsed++;
-        continue;
-      }
+      if (!items.length) { setSt(`⚠ ${f.name} 未解析到数据，跳过`, 'warn'); parsed++; continue; }
 
       items.forEach(item => {
         const idx = ALL.findIndex(x => x.name === item.name);
-        if (idx === -1) ALL.push(item);
-        else ALL[idx] = item;
+        if (idx === -1) ALL.push(item); else ALL[idx] = item;
       });
-
       if (res.sample_no && !document.getElementById('inp-sno').value)
         document.getElementById('inp-sno').value = res.sample_no;
       if (res.operator && !document.getElementById('inp-opr').value)
@@ -324,11 +368,9 @@ _json.dumps(parse_tdms_js(bytes(_raw), _fn))
       loaded.set(f.name, items.length);
       addChip(f.name, items.length);
       parsed++;
-
     } catch(err) {
       setSt(`❌ 解析失败: ${f.name} — ${err}`, 'err');
-      console.error(err);
-      parsed++;
+      console.error(err); parsed++;
     }
   }
 
@@ -336,10 +378,9 @@ _json.dumps(parse_tdms_js(bytes(_raw), _fn))
   setSt(`✅ 已加载 ${parsed} 个文件，共 ${ALL.length} 个测试项`, 'ok');
   renderAll();
   document.getElementById('btn-exp').disabled = ALL.length === 0;
-  document.getElementById('fi').value = '';  // 允许重新选同名文件
+  document.getElementById('fi').value = '';
 }
 
-// 把 FileReader 回调包装为 Promise
 function readFileAsync(file) {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
@@ -384,50 +425,40 @@ function clearAll() {
 
 // ── Tab ────────────────────────────────────────────────────────────────────
 function switchTab(i) {
-  document.querySelectorAll('.tab').forEach((t, j) => t.classList.toggle('active', j === i));
-  document.querySelectorAll('.tab-content').forEach((t, j) => t.classList.toggle('active', j === i));
-  if (i === 2) chartObjs.forEach(c => c.resize());
+  document.querySelectorAll('.tab').forEach((t,j) => t.classList.toggle('active', j===i));
+  document.querySelectorAll('.tab-content').forEach((t,j) => t.classList.toggle('active', j===i));
+  if (i===2) chartObjs.forEach(c => c.resize());
 }
 
 // ── Stats ──────────────────────────────────────────────────────────────────
 function calcStats(vals) {
   const n = vals.length;
-  const mean = vals.reduce((a, b) => a + b, 0) / n;
-  const std  = Math.sqrt(vals.reduce((s, v) => s + (v - mean) ** 2, 0) / (n - 1));
-  const cov  = mean !== 0 ? std / mean * 100 : NaN;
-  return { n, mean, std, min: Math.min(...vals), max: Math.max(...vals), cov };
+  const mean = vals.reduce((a,b) => a+b, 0) / n;
+  const std  = Math.sqrt(vals.reduce((s,v) => s+(v-mean)**2, 0) / (n-1));
+  const cov  = mean !== 0 ? std/mean*100 : NaN;
+  return { n, mean, std, min:Math.min(...vals), max:Math.max(...vals), cov };
 }
-const f = (v, d = 3) => isFinite(v) ? v.toFixed(d) : 'N/A';
+const f = (v, d=3) => isFinite(v) ? v.toFixed(d) : 'N/A';
 function covBadge(cov) {
-  const cls = cov > 15 ? 'cov-b' : cov > 5 ? 'cov-w' : 'cov-ok';
-  return `<span class="${cls}">${f(cov, 2)}%</span>`;
+  const cls = cov>15 ? 'cov-b' : cov>5 ? 'cov-w' : 'cov-ok';
+  return `<span class="${cls}">${f(cov,2)}%</span>`;
 }
 
-// ── Render all ─────────────────────────────────────────────────────────────
+// ── Render ─────────────────────────────────────────────────────────────────
 function renderAll() {
   document.getElementById('preview-card').style.display = '';
-  renderSummary();
-  renderValues();
-  renderCharts();
+  renderSummary(); renderValues(); renderCharts();
 }
 
 function renderSummary() {
-  const tb = document.getElementById('tb-summary');
-  tb.innerHTML = '';
-  ALL.forEach((t, i) => {
+  const tb = document.getElementById('tb-summary'); tb.innerHTML = '';
+  ALL.forEach((t,i) => {
     const s = calcStats(t.values);
     const tr = document.createElement('tr');
-    tr.className = i % 2 === 1 ? 'alt' : 'norm';
-    tr.innerHTML = `
-      <td class="L">${t.name}</td>
-      <td class="C">${t.unit}</td>
-      <td class="C">${t.std}</td>
-      <td class="C"><b>${f(s.mean)}</b></td>
-      <td class="C">${f(s.min)}</td>
-      <td class="C">${f(s.max)}</td>
-      <td class="C">${f(s.std)}</td>
-      <td class="C">${covBadge(s.cov)}</td>
-      <td class="C">${s.n}</td>`;
+    tr.className = i%2===1 ? 'alt' : 'norm';
+    tr.innerHTML = `<td class="L">${t.name}</td><td class="C">${t.unit}</td><td class="C">${t.std}</td>
+      <td class="C"><b>${f(s.mean)}</b></td><td class="C">${f(s.min)}</td><td class="C">${f(s.max)}</td>
+      <td class="C">${f(s.std)}</td><td class="C">${covBadge(s.cov)}</td><td class="C">${s.n}</td>`;
     tb.appendChild(tr);
   });
 }
@@ -436,98 +467,68 @@ function renderValues() {
   const maxN = Math.max(...ALL.map(t => t.values.length));
   const thr = document.getElementById('th-vals');
   let h = `<th class="L" style="min-width:160px">测试项目 / Test Item</th><th>单位\nUnit</th>`;
-  for (let i = 1; i <= maxN; i++) h += `<th>测量值${i}\nVal ${i}</th>`;
+  for (let i=1; i<=maxN; i++) h += `<th>测量值${i}\nVal ${i}</th>`;
   h += `<th>均值\nMean</th><th>标准差\nStd</th><th>最小值\nMin</th><th>最大值\nMax</th><th>CoV%</th>`;
   thr.innerHTML = h;
-
-  const tb = document.getElementById('tb-vals');
-  tb.innerHTML = '';
-  ALL.forEach((t, i) => {
+  const tb = document.getElementById('tb-vals'); tb.innerHTML = '';
+  ALL.forEach((t,i) => {
     const s = calcStats(t.values);
     const tr = document.createElement('tr');
-    tr.className = i % 2 === 1 ? 'alt' : 'norm';
+    tr.className = i%2===1 ? 'alt' : 'norm';
     let cells = `<td class="L">${t.name}</td><td class="C">${t.unit}</td>`;
-    for (let vi = 0; vi < maxN; vi++) {
+    for (let vi=0; vi<maxN; vi++)
       cells += `<td class="R">${t.values[vi] !== undefined ? f(t.values[vi]) : ''}</td>`;
-    }
-    cells += `<td class="R"><b>${f(s.mean)}</b></td>`;
-    cells += `<td class="R">${f(s.std)}</td>`;
-    cells += `<td class="R">${f(s.min)}</td>`;
-    cells += `<td class="R">${f(s.max)}</td>`;
-    cells += `<td class="C">${covBadge(s.cov)}</td>`;
-    tr.innerHTML = cells;
-    tb.appendChild(tr);
+    cells += `<td class="R"><b>${f(s.mean)}</b></td><td class="R">${f(s.std)}</td>
+      <td class="R">${f(s.min)}</td><td class="R">${f(s.max)}</td><td class="C">${covBadge(s.cov)}</td>`;
+    tr.innerHTML = cells; tb.appendChild(tr);
   });
 }
 
 function renderCharts() {
   chartObjs.forEach(c => c.destroy()); chartObjs = [];
-  const grid = document.getElementById('chart-grid');
-  grid.innerHTML = '';
-
+  const grid = document.getElementById('chart-grid'); grid.innerHTML = '';
   ALL.forEach(t => {
-    const s = calcStats(t.values);
-    const mean = s.mean, s3 = 3 * s.std;
-    const labels = t.values.map((_, i) => i + 1);
-
+    const s = calcStats(t.values); const mean = s.mean, s3 = 3*s.std;
+    const labels = t.values.map((_,i) => i+1);
     const card = document.createElement('div'); card.className = 'chart-card';
     const cid = 'ch_' + Math.random().toString(36).slice(2);
     card.innerHTML = `
       <div class="ch-title">▶ ${t.name} [${t.unit}] — ${t.std}</div>
       <div class="ch-body"><canvas id="${cid}"></canvas></div>
       <div class="ch-stats">
-        <div>均值 Mean: <span>${f(s.mean)}</span></div>
-        <div>标准差 Std: <span>${f(s.std)}</span></div>
-        <div>最小值 Min: <span>${f(s.min)}</span></div>
-        <div>最大值 Max: <span>${f(s.max)}</span></div>
-        <div>变异系数 CoV: <span>${f(s.cov, 2)}%</span></div>
-        <div>Mean±3σ: <span>${f(mean - s3)} ~ ${f(mean + s3)}</span></div>
+        <div>均值 Mean: <span>${f(s.mean)}</span></div><div>标准差 Std: <span>${f(s.std)}</span></div>
+        <div>最小值 Min: <span>${f(s.min)}</span></div><div>最大值 Max: <span>${f(s.max)}</span></div>
+        <div>变异系数 CoV: <span>${f(s.cov,2)}%</span></div>
+        <div>Mean±3σ: <span>${f(mean-s3)} ~ ${f(mean+s3)}</span></div>
       </div>`;
     grid.appendChild(card);
-
     const ctx = document.getElementById(cid).getContext('2d');
     const ch = new Chart(ctx, {
       type: 'line',
-      data: {
-        labels,
-        datasets: [
-          { label: '测量值', data: t.values,
-            borderColor: '#1F497D', backgroundColor: '#1F497D',
-            borderWidth: 2, pointRadius: 5, pointBackgroundColor: '#1F497D', tension: 0,
-            datalabels: {
-              display: true,
-              align: 'top',
-              anchor: 'end',
-              formatter: v => f(v, 3),
-              font: { size: 9.5, weight: '600', family: 'Arial' },
-              color: '#17375E',
-              padding: { bottom: 2 },
-              clip: false,
-            }},
-          { label: 'Mean', data: t.values.map(() => mean),
-            borderColor: '#C0504D', borderWidth: 1.8, borderDash: [6, 3],
-            pointRadius: 0, fill: false, datalabels: { display: false } },
-          { label: 'Mean+3σ', data: t.values.map(() => mean + s3),
-            borderColor: '#70AD47', borderWidth: 1.2, borderDash: [4, 4],
-            pointRadius: 0, fill: false, datalabels: { display: false } },
-          { label: 'Mean-3σ', data: t.values.map(() => mean - s3),
-            borderColor: '#70AD47', borderWidth: 1.2, borderDash: [4, 4],
-            pointRadius: 0, fill: false, datalabels: { display: false } },
-        ]
-      },
+      data: { labels, datasets: [
+        { label:'测量值', data:t.values, borderColor:'#1F497D', backgroundColor:'#1F497D',
+          borderWidth:2, pointRadius:5, pointBackgroundColor:'#1F497D', tension:0,
+          datalabels:{ display:true, align:'top', anchor:'end', formatter:v=>f(v,3),
+            font:{size:9.5,weight:'600',family:'Arial'}, color:'#17375E', padding:{bottom:2}, clip:false }},
+        { label:'Mean', data:t.values.map(()=>mean), borderColor:'#C0504D',
+          borderWidth:1.8, borderDash:[6,3], pointRadius:0, fill:false, datalabels:{display:false}},
+        { label:'Mean+3σ', data:t.values.map(()=>mean+s3), borderColor:'#70AD47',
+          borderWidth:1.2, borderDash:[4,4], pointRadius:0, fill:false, datalabels:{display:false}},
+        { label:'Mean-3σ', data:t.values.map(()=>mean-s3), borderColor:'#70AD47',
+          borderWidth:1.2, borderDash:[4,4], pointRadius:0, fill:false, datalabels:{display:false}},
+      ]},
       options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } },
-          tooltip: { callbacks: { label: c => `${c.dataset.label}: ${f(c.raw)}` } },
-          datalabels: { display: false }   // 全局默认关闭，由 dataset 级别覆盖
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{position:'right',labels:{boxWidth:10,font:{size:10}}},
+          tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${f(c.raw)}`}},
+          datalabels:{display:false}
         },
-        scales: {
-          x: { title: { display: true, text: 'Measurement No.', font: { size: 10 } },
-               grid: { color: '#e8e8e8', borderDash: [3, 3] }, ticks: { font: { size: 10 } } },
-          y: { title: { display: true, text: t.unit, font: { size: 10 } },
-               grid: { color: '#e8e8e8', borderDash: [3, 3] },
-               ticks: { font: { size: 10 }, callback: v => f(v) } }
+        scales:{
+          x:{title:{display:true,text:'Measurement No.',font:{size:10}},
+             grid:{color:'#e8e8e8',borderDash:[3,3]},ticks:{font:{size:10}}},
+          y:{title:{display:true,text:t.unit,font:{size:10}},
+             grid:{color:'#e8e8e8',borderDash:[3,3]},ticks:{font:{size:10},callback:v=>f(v)}}
         }
       }
     });
@@ -543,7 +544,6 @@ async function doExport() {
   try {
     const sno = document.getElementById('inp-sno').value.trim();
     const opr = document.getElementById('inp-opr').value.trim();
-    // JSON 传递，完全可靠
     const payload = JSON.stringify({ all_data: ALL, sample_no: sno, operator: opr });
     pyodide.globals.set('_export_json', payload);
     const xlBytes = await pyodide.runPythonAsync(`
@@ -556,12 +556,10 @@ build_excel_bytes(_d['all_data'], _d['sample_no'], _d['operator'])
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `filter_media_report_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    a.click(); URL.revokeObjectURL(a.href);
     setSt(`✅ Excel 已下载（${ALL.length} 个测试项，3 个 Sheet：汇总报告 · 单值明细 · 曲线图表）`, 'ok');
   } catch(e) {
-    setSt('❌ 导出失败: ' + e, 'err');
-    console.error(e);
+    setSt('❌ 导出失败: ' + e, 'err'); console.error(e);
   }
   btn.disabled = false; btn.textContent = '📥 导出带样式 Excel（含曲线图）';
 }
@@ -569,8 +567,7 @@ build_excel_bytes(_d['all_data'], _d['sample_no'], _d['operator'])
 // ── Status ─────────────────────────────────────────────────────────────────
 function setSt(msg, lv) {
   const el = document.getElementById('st');
-  el.className = 'st show ' + lv;
-  el.textContent = msg;
+  el.className = 'st show ' + lv; el.textContent = msg;
 }
 
 // ── Python Code ────────────────────────────────────────────────────────────
@@ -763,7 +760,6 @@ def _add_chart(ws, t, hr):
 
 def build_excel_bytes(all_data, sample_no='', operator=''):
     wb=openpyxl.Workbook()
-    # Sheet 1
     ws1=wb.active; ws1.title='\u6c47\u603b\u62a5\u544a Summary'
     ws1.merge_cells('A1:I1')
     sc(ws1['A1'],'\u6ee4\u6750\u6d4b\u8bd5\u62a5\u544a / Filter Media Test Report',
@@ -794,7 +790,6 @@ def build_excel_bytes(all_data, sample_no='', operator=''):
     for col,w in zip('ABCDEFGHI',[35,10,14,12,12,12,12,12,8]):
         ws1.column_dimensions[col].width=w
     ws1.freeze_panes='A4'
-    # Sheet 2
     ws2=wb.create_sheet('\u5355\u503c\u660e\u7ec6 Individual Values')
     maxN=max(len(t['values']) for t in all_data); total_c=2+maxN+5; lc=get_column_letter(total_c)
     ws2.merge_cells(f'A1:{lc}1')
@@ -824,7 +819,6 @@ def build_excel_bytes(all_data, sample_no='', operator=''):
     for ci in range(3,total_c+1): ws2.column_dimensions[get_column_letter(ci)].width=9
     for ci in range(3+maxN,total_c+1): ws2.column_dimensions[get_column_letter(ci)].width=11
     ws2.freeze_panes='A3'
-    # Sheet 3
     ws3=wb.create_sheet('\u66f2\u7ebf\u56fe\u8868 Charts')
     for col,w in {'A':6,'B':14,'C':12,'D':13,'E':13,'F':2,'G':28,'H':1}.items():
         ws3.column_dimensions[col].width=w
@@ -848,25 +842,10 @@ def build_excel_bytes(all_data, sample_no='', operator=''):
         cur+=CHART_ROWS
     buf=io.BytesIO(); wb.save(buf); buf.seek(0); return buf.read()
 
-print("Python modules ready — serial processing enabled")
+print("Python modules ready")
 `;
 
-// ── Login ──────────────────────────────────────────────────────────────────
-function doLogin() {
-  if (!pyodide) return; // 环境未就绪时忽略
-  const pwd = document.getElementById('login-pwd').value;
-  const err = document.getElementById('login-err');
-  if (pwd === 'FM') {
-    document.getElementById('login-overlay').style.display = 'none';
-    err.classList.remove('show');
-  } else {
-    err.classList.add('show');
-    document.getElementById('login-pwd').value = '';
-    document.getElementById('login-pwd').focus();
-  }
-}
-
-// 注册 datalabels 插件（仅对需要的图表局部启用）
+// ── Init ───────────────────────────────────────────────────────────────────
 Chart.register(ChartDataLabels);
 boot();
 </script>
