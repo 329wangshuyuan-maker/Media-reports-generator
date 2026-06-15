@@ -309,11 +309,15 @@ function loadScript(src) {
 }
 
 // ── Login ──────────────────────────────────────────────────────────────────
-function doLogin() {
+const PWD_HASH = 'dc72daa266582fba62836575af00ade547932927416128dbb80734e9fb39395a';
+
+async function doLogin() {
   if (!pyodide) return;
   const pwd = document.getElementById('login-pwd').value;
   const err = document.getElementById('login-err');
-  if (pwd === 'FM') {
+  const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pwd));
+  const hashHex = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2,'0')).join('');
+  if (hashHex === PWD_HASH) {
     document.getElementById('login-overlay').style.display = 'none';
     err.classList.remove('show');
   } else {
