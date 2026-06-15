@@ -62,9 +62,43 @@ tr.alt td{background:#dce6f1}tr.norm td{background:#fff}
 .ch-stats{display:grid;grid-template-columns:1fr 1fr;gap:2px;padding:6px 10px;border-top:1px solid #eee;font-size:10px;color:#555}
 .ch-stats span{font-weight:600}
 footer{text-align:center;font-size:10px;color:#bbb;margin-top:.5rem;padding-bottom:.5rem}
+/* ── Login overlay ── */
+#login-overlay{position:fixed;inset:0;background:#f5f5f0;display:flex;align-items:center;justify-content:center;z-index:9999}
+.login-box{background:#fff;border-radius:14px;border:1px solid #e2e0d8;padding:2.2rem 2.4rem;width:320px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,.10);display:flex;flex-direction:column;align-items:center;gap:1rem}
+.login-logo{background:#17375E;border-radius:10px;width:52px;height:52px;display:flex;align-items:center;justify-content:center}
+.login-box h2{font-size:15px;font-weight:700;color:#1a1a1a;text-align:center;line-height:1.4}
+.login-box p{font-size:11px;color:#999;text-align:center;margin-top:-.4rem}
+.login-field{width:100%;display:flex;flex-direction:column;gap:5px}
+.login-field label{font-size:11px;font-weight:600;color:#555}
+.login-field input{border:1px solid #ccc;border-radius:7px;padding:9px 12px;font-size:14px;letter-spacing:.15em;width:100%;text-align:center}
+.login-field input:focus{outline:none;border-color:#4472C4;box-shadow:0 0 0 2px #d0e4f8}
+.login-err{font-size:11px;color:#a32d2d;background:#fcebeb;border-radius:6px;padding:5px 10px;width:100%;text-align:center;display:none}
+.login-err.show{display:block}
+.btn-login{width:100%;padding:9px;font-size:13px;font-weight:700;background:#17375E;color:#fff;border:none;border-radius:7px;cursor:pointer;transition:background .15s}
+.btn-login:hover{background:#1d4575}
 </style>
 </head>
 <body>
+<!-- Login Overlay -->
+<div id="login-overlay">
+  <div class="login-box">
+    <div class="login-logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+    </div>
+    <h2>滤材测试报告生成器<br>Filter Media Report Generator</h2>
+    <p>请输入访问密码 / Enter Password</p>
+    <div class="login-field">
+      <label>密码 Password</label>
+      <input type="password" id="login-pwd" placeholder="••••" maxlength="20" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="login-err" id="login-err">密码错误，请重试 / Incorrect password</div>
+    <button class="btn-login" onclick="doLogin()">进入 / Enter</button>
+  </div>
+</div>
+
 <div class="wrap">
 
 <div class="hdr">
@@ -780,6 +814,20 @@ def build_excel_bytes(all_data, sample_no='', operator=''):
 
 print("Python modules ready — serial processing enabled")
 `;
+
+// ── Login ──────────────────────────────────────────────────────────────────
+function doLogin() {
+  const pwd = document.getElementById('login-pwd').value;
+  const err = document.getElementById('login-err');
+  if (pwd === 'FM') {
+    document.getElementById('login-overlay').style.display = 'none';
+    err.classList.remove('show');
+  } else {
+    err.classList.add('show');
+    document.getElementById('login-pwd').value = '';
+    document.getElementById('login-pwd').focus();
+  }
+}
 
 // 注册 datalabels 插件（仅对需要的图表局部启用）
 Chart.register(ChartDataLabels);
